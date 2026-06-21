@@ -35,13 +35,21 @@ const FEE_TIERS: readonly number[] = [500, 3000, 10000];
 export async function getUbeswapQuote(amountInRaw: bigint): Promise<RouteQuote> {
   try {
     const poolInfo = await findBestPool();
-    if (!poolInfo) return unavailable();
+    if (!poolInfo) {
+      console.warn("[ubeswapQuoter] no USDT/COPm pool found on any fee tier");
+      return unavailable();
+    }
 
     const { poolAddress, fee } = poolInfo;
+    console.log(`[ubeswapQuoter] pool found: ${poolAddress} fee=${fee}`);
 
     // TVL guard: check USDT balance of pool
     const tvl = await getPoolUsdtTvl(poolAddress);
-    if (tvl < MIN_TVL_USDT) return unavailable();
+    console.log(`[ubeswapQuoter] pool TVL (USDT raw): ${tvl}`);
+    if (tvl < MIN_TVL_USDT) {
+      console.warn(`[ubeswapQuoter] TVL too low: ${tvl} < ${MIN_TVL_USDT}`);
+      return unavailable();
+    }
 
     // Quote via QuoterV2
     const result = (await publicClient.readContract({
