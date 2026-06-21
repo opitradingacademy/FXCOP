@@ -74,7 +74,8 @@ export async function getUbeswapQuote(amountInRaw: bigint): Promise<RouteQuote> 
       isAvailable: true,
       poolFee: fee,
     };
-  } catch {
+  } catch (err) {
+    console.error("[ubeswapQuoter] failed:", err);
     return unavailable();
   }
 }

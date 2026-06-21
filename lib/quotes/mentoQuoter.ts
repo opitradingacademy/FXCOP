@@ -59,7 +59,8 @@ export async function getMentoQuote(amountInRaw: bigint): Promise<RouteQuote> {
       savingsVsBaseline: 0n,
       isAvailable: true,
     };
-  } catch {
+  } catch (err) {
+    console.error("[mentoQuoter] getAmountsOut failed:", err);
     return unavailable();
   }
 }
