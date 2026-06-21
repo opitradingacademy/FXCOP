@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# md
+*.md
+
+# Hardhat
+artifacts/
+cache/
+typechain-types/
+ignition/deployments/
+
+# Hardhat Ignition journal (contains tx hashes, not secrets, but not needed in repo)
+# ignition/deployments/ already above
