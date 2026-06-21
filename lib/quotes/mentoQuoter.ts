@@ -22,7 +22,7 @@ async function getServices() {
     const poolService = new PoolService(pc, CELO_CHAIN_ID);
     const routeService = new RouteService(pc, CELO_CHAIN_ID, poolService);
     const quoteService = new QuoteService(pc, CELO_CHAIN_ID, routeService);
-    const swapService = new SwapService(pc, CELO_CHAIN_ID, poolService, routeService);
+    const swapService = new SwapService(pc, CELO_CHAIN_ID, routeService, quoteService);
     _services = { poolService, routeService, quoteService, swapService };
   }
   return _services;
