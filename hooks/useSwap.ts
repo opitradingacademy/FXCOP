@@ -5,6 +5,7 @@ import { usePublicClient, useWalletClient } from "wagmi";
 import { parseAbi, encodeFunctionData } from "viem";
 import { MAINNET } from "../lib/contracts";
 import { calcMinAmountOut } from "../lib/decimals";
+import { buildMentoRouteData } from "../lib/quotes/mentoQuoter";
 import type { RouteQuote, SwapState } from "../lib/quotes/types";
 
 const FXCOP_ROUTER_ADDRESS = process.env.NEXT_PUBLIC_FXCOP_ROUTER as `0x${string}`;
@@ -99,14 +100,16 @@ export function useSwap(): UseSwapReturn {
         const minAmountOut = calcMinAmountOut(quote.amountOutNet, SLIPPAGE_PCT);
 
         // routeData encodes recipient = FXCOPRouter so COPm lands there for fee split
-        const routeData = encodeRouteData({
-          amountIn,
-          minAmountOut,
-          routeType,
-          recipient: FXCOP_ROUTER_ADDRESS,
-          deadline,
-          poolFee: quote.poolFee,
-        });
+        const routeData = routeType === 0
+          ? await buildMentoRouteData(amountIn, minAmountOut, FXCOP_ROUTER_ADDRESS, deadline)
+          : encodeRouteData({
+              amountIn,
+              minAmountOut,
+              routeType,
+              recipient: FXCOP_ROUTER_ADDRESS,
+              deadline,
+              poolFee: quote.poolFee,
+            });
 
         const swapTxHash = await walletClient.writeContract({
           address: FXCOP_ROUTER_ADDRESS,
