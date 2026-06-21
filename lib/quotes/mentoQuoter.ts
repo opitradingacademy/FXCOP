@@ -32,9 +32,11 @@ const MENTO_ROUTES = [
  * @param amountInRaw - USDT amount in raw units (6 decimals)
  */
 export async function getMentoQuote(amountInRaw: bigint): Promise<RouteQuote> {
+  console.log("[mentoQuoter] called, amountIn:", amountInRaw.toString());
   if (amountInRaw === 0n) return unavailable();
 
   try {
+    console.log("[mentoQuoter] calling getAmountsOut...");
     const amounts = await publicClient.readContract({
       address: MAINNET.MENTO_ROUTER_V3 as `0x${string}`,
       abi: MENTO_ROUTER_ABI,
@@ -43,6 +45,7 @@ export async function getMentoQuote(amountInRaw: bigint): Promise<RouteQuote> {
     });
 
     // amounts[0] = amountIn (USDT), amounts[1] = USDm, amounts[2] = COPm gross
+    console.log("[mentoQuoter] amounts:", amounts.map(String));
     const grossAmountOut = amounts[amounts.length - 1];
     if (!grossAmountOut || grossAmountOut === 0n) return unavailable();
 
