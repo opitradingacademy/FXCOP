@@ -1,48 +1,57 @@
-import { QuoteService, RouteService, PoolService } from "@mento-protocol/mento-sdk";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, parseAbi } from "viem";
 import { celo } from "viem/chains";
 import { MAINNET } from "../contracts";
 import type { RouteQuote } from "./types";
 
 const publicClient = createPublicClient({ chain: celo, transport: http() });
-const CELO_CHAIN_ID = 42220;
 
-// Services are stateful (cache routes) — instantiate once
-let _quoteService: QuoteService | null = null;
+// Mento Router V3 ABI — only the view functions we need
+const MENTO_ROUTER_ABI = parseAbi([
+  "function getAmountsOut(uint256 amountIn, (address from, address to, address factory)[] routes) external view returns (uint256[] amounts)",
+]);
 
-async function getQuoteService(): Promise<QuoteService> {
-  if (!_quoteService) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pc = publicClient as any;
-    const poolService = new PoolService(pc, CELO_CHAIN_ID);
-    const routeService = new RouteService(pc, CELO_CHAIN_ID, poolService);
-    _quoteService = new QuoteService(pc, CELO_CHAIN_ID, routeService);
-  }
-  return _quoteService;
-}
+// Hardcoded 2-hop route: USDT → USDm → COPm
+// All Mento FPMM pools use BiPoolManager as their factory.
+const MENTO_ROUTES = [
+  {
+    from: MAINNET.USDT as `0x${string}`,
+    to: MAINNET.USDM as `0x${string}`,
+    factory: MAINNET.MENTO_BIPOOLMANAGER as `0x${string}`,
+  },
+  {
+    from: MAINNET.USDM as `0x${string}`,
+    to: MAINNET.COPM as `0x${string}`,
+    factory: MAINNET.MENTO_BIPOOLMANAGER as `0x${string}`,
+  },
+] as const;
 
 /**
- * Get a Mento quote for USDT → COPm.
- * Uses @mento-protocol/mento-sdk QuoteService which handles USDT → USDm → COPm multi-hop.
+ * Get a Mento quote for USDT → COPm via Router V3 getAmountsOut.
+ * Calls the router directly — no SDK dependency, works for any token the router supports.
  *
  * @param amountInRaw - USDT amount in raw units (6 decimals)
  */
 export async function getMentoQuote(amountInRaw: bigint): Promise<RouteQuote> {
+  if (amountInRaw === 0n) return unavailable();
+
   try {
-    const quoteService = await getQuoteService();
+    const amounts = await publicClient.readContract({
+      address: MAINNET.MENTO_ROUTER_V3 as `0x${string}`,
+      abi: MENTO_ROUTER_ABI,
+      functionName: "getAmountsOut",
+      args: [amountInRaw, MENTO_ROUTES],
+    });
 
-    const amountOut = await quoteService.getAmountOut(
-      MAINNET.USDT,
-      MAINNET.COPM,
-      amountInRaw
-    );
+    // amounts[0] = amountIn (USDT), amounts[1] = USDm, amounts[2] = COPm gross
+    const grossAmountOut = amounts[amounts.length - 1];
+    if (!grossAmountOut || grossAmountOut === 0n) return unavailable();
 
-    const feeApp = (amountOut * 5n) / 10_000n;
-    const amountOutNet = amountOut - feeApp;
+    const feeApp = (grossAmountOut * 5n) / 10_000n;
+    const amountOutNet = grossAmountOut - feeApp;
 
     return {
       routeType: "mento",
-      amountOut,
+      amountOut: grossAmountOut,
       amountOutNet,
       amountOutFormatted: formatCOPmForDisplay(amountOutNet),
       feeApp,
