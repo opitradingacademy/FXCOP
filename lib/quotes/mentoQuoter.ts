@@ -92,8 +92,8 @@ export async function buildMentoRouteData(
     { slippageTolerance: 0, deadline },  // slippage = 0: we handle it with minAmountOut
   );
 
-  // encodeSwapCall: swapExactTokensForTokens(amountIn, minOut, routes, recipient, deadline)
-  return swapService.encodeSwapCall(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (swapService as any).encodeSwapCall(
     amountIn,
     minAmountOut,
     result.routerRoutes,
