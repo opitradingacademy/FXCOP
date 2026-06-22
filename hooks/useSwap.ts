@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { Mento } from "@mento-protocol/mento-sdk";
 import { MAINNET, getContracts, CELO_TESTNET_CHAIN_ID } from "../lib/contracts";
+import { useRealChainId } from "./useRealChainId";
 import type { SwapState } from "../lib/quotes/types";
 
 const SLIPPAGE_PCT = 0.5;        // 0.5% slippage tolerance
@@ -46,7 +47,7 @@ export function useSwap(): UseSwapReturn {
   const [amountOut, setAmountOut] = useState<bigint | null>(null);
 
   const { address } = useAccount();
-  const chainId = useChainId();
+  const chainId = useRealChainId();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
 
@@ -61,6 +62,12 @@ export function useSwap(): UseSwapReturn {
       try {
         setError(null);
         setState("building");
+
+        if (chainId === undefined) {
+          setError("Red no detectada. Reconectá tu wallet.");
+          setState("error");
+          return;
+        }
 
         // ── 1. Build swap transaction via Mento SDK ──
         //    The SDK returns { approval, swap: { params, amountOutMin, ... } }.

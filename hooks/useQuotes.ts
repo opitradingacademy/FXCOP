@@ -11,13 +11,13 @@ const QUOTE_STALE_MS = 30_000; // invalidate before confirm if stale >30s
  * Returns undefined until the first successful fetch.
  *
  * @param amountInRaw - USDT in raw units (6 dec). Pass 0n to disable.
- * @param chainId     - 42220 (mainnet) or 11155111 (Celo Sepolia)
+ * @param chainId     - 42220 (mainnet), 11142220 (Celo Sepolia), undefined = no chain
  */
-export function useQuotes(amountInRaw: bigint, chainId: number) {
+export function useQuotes(amountInRaw: bigint, chainId: number | undefined) {
   return useQuery<Quote>({
     queryKey: ["fxcop-quote", chainId, amountInRaw.toString()],
-    queryFn: () => getMentoQuote(amountInRaw, chainId),
-    enabled: amountInRaw > 0n,
+    queryFn: () => getMentoQuote(amountInRaw, chainId as number),
+    enabled: amountInRaw > 0n && chainId !== undefined,
     refetchInterval: 5_000,
     staleTime: QUOTE_STALE_MS,
     gcTime: 60_000,
@@ -27,3 +27,4 @@ export function useQuotes(amountInRaw: bigint, chainId: number) {
 }
 
 export { QUOTE_STALE_MS };
+

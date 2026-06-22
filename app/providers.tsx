@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount, useChainId, useConfig } from "wagmi";
+import { useConfig } from "wagmi";
 import { reconnect } from "wagmi/actions";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider } from "wagmi";
@@ -20,7 +20,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <NetworkWatcher />
+        <WagmiReconnect />
         {children}
       </QueryClientProvider>
     </WagmiProvider>
@@ -28,47 +28,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Forces wagmi to re-read chainId + account state when the wallet
- * fires chainChanged / accountsChanged events. Without this, wagmi
- * can stay stale on the initial value if the wallet wasn't ready
- * when the app mounted.
+ * Restores prior wagmi session on mount. Without this, wagmi stays
+ * disconnected and the chainId reads undefined until the user
+ * manually connects. re-mounts the session if a wallet was previously
+ * authorized.
  */
-function NetworkWatcher() {
-  const { isConnected } = useAccount();
-  const chainId = useChainId();
+function WagmiReconnect() {
   const config = useConfig();
-  const [tick, setTick] = useState(0);
 
-  // On mount: try to reconnect to restore prior session state.
   useEffect(() => {
     reconnect(config).catch(() => {
-      // Ignore — user might not have a prior session.
+      // No prior session — that's fine.
     });
   }, [config]);
-
-  // Listen for chainChanged / accountsChanged at the raw ethereum level
-  // and force a re-render so wagmi re-reads the chainId.
-  useEffect(() => {
-    const ethereum = (window as any).ethereum;
-    if (!ethereum?.on) return;
-
-    const handleChange = () => setTick((t) => t + 1);
-
-    ethereum.on("chainChanged", handleChange);
-    ethereum.on("accountsChanged", handleChange);
-
-    return () => {
-      ethereum.removeListener?.("chainChanged", handleChange);
-      ethereum.removeListener?.("accountsChanged", handleChange);
-    };
-  }, []);
-
-  // Surface the current chainId in console for debugging.
-  useEffect(() => {
-    if (isConnected) {
-      console.log("[FXCOP] chainId =", chainId);
-    }
-  }, [chainId, isConnected, tick]);
 
   return null;
 }

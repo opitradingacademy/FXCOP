@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAccount, useChainId, useConnect } from "wagmi";
+import { useAccount, useConnect } from "wagmi";
 import { metaMask, injected } from "wagmi/connectors";
 import { parseUnits } from "viem";
 import { useWallet } from "@/hooks/useWallet";
 import { useQuotes } from "@/hooks/useQuotes";
 import { useSwap } from "@/hooks/useSwap";
+import { useRealChainId } from "@/hooks/useRealChainId";
 import { AppShell, AppHeader, CtaButton } from "@/components/AppShell";
 import { SwapInputCard } from "@/components/swap/SwapInputCard";
 import {
@@ -17,7 +18,7 @@ import {
 export default function SwapPage() {
   const router = useRouter();
   const { isConnected } = useAccount();
-  const chainId = useChainId();
+  const chainId = useRealChainId();
   const { connect, isPending: isConnecting } = useConnect();
   const { usdtBalance, isLoading: walletLoading } = useWallet();
 
