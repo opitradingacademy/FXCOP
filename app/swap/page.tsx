@@ -33,7 +33,7 @@ export default function SwapPage() {
       // Celo Sepolia chain params (EIP-3085 / EIP-3326)
       await (window as any).ethereum.request({
         method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0xaa044c" }], // 11155111 in hex
+        params: [{ chainId: "0xaa044c" }], // 11142220 in hex (Celo Sepolia)
       });
     } catch (err: any) {
       // 4902 = chain not added to wallet. Add it then retry.
@@ -44,10 +44,10 @@ export default function SwapPage() {
             params: [
               {
                 chainId: "0xaa044c",
-                chainName: "Celo Sepolia (Alfajores Testnet)",
-                nativeCurrency: { name: "CELO", symbol: "A-CELO", decimals: 18 },
-                rpcUrls: ["https://alfajores-forno.celo-testnet.org"],
-                blockExplorerUrls: ["https://alfajores.celoscan.io"],
+                chainName: "Celo Sepolia",
+                nativeCurrency: { name: "CELO", symbol: "CELO", decimals: 18 },
+                rpcUrls: ["https://forno.celo-sepolia.celo-testnet.org"],
+                blockExplorerUrls: ["https://celo-sepolia.blockscout.com"],
               },
             ],
           });

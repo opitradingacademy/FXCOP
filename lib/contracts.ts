@@ -3,7 +3,7 @@
  * Contract addresses for FXCOP on Celo L2.
  *
  * MAINNET: Celo 42220
- * TESTNET: Celo Sepolia 11155111
+ * TESTNET: Celo Sepolia 11142220
  *
  * INVARIANT: feeCurrency MUST always be USDT_FEE_ADAPTER (not the token address).
  *
@@ -48,8 +48,10 @@ export const TESTNET = {
 // Chain IDs
 // ---------------------------------------------------------------------------
 export const CELO_MAINNET_CHAIN_ID = 42220;
-export const CELO_SEPOLIA_CHAIN_ID = 11155111; // also used in some Celo docs
-export const CELO_TESTNET_CHAIN_ID = 11155111;
+// Celo Sepolia is the official L2 testnet (replaced the old L1 Alfajores 44787).
+// wagmi v2's `celoAlfajores` chain points to 11142220.
+export const CELO_SEPOLIA_CHAIN_ID = 11142220;
+export const CELO_TESTNET_CHAIN_ID = CELO_SEPOLIA_CHAIN_ID;
 
 // ---------------------------------------------------------------------------
 // Helper — typed contract accessor
@@ -69,7 +71,7 @@ export function getContracts(chainId: number): MainnetContracts | TestnetContrac
       return TESTNET;
     default:
       throw new Error(
-        `Unsupported chainId ${chainId}. FXCOP only supports Celo mainnet (42220) and Celo Sepolia (11155111).`
+        `Unsupported chainId ${chainId}. FXCOP only supports Celo mainnet (42220) and Celo Sepolia (11142220).`
       );
   }
 }
