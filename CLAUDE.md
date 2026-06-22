@@ -12,7 +12,8 @@ v1 usa Mento SDK directo. Sin router propio, sin fee. Decisión validada en sesi
 - ✅ Hard guard contra mainnet: el botón "Comprar COPm" solo se habilita en testnet
 - ✅ MiniPay invariants: `feeCurrency: USDT_FEE_ADAPTER`, legacy `gasPrice` only, no personal_sign
 - ✅ Build verde, typecheck verde, deploy en Vercel desde `master`
-- ⏸ **Bloqueado para end-to-end test**: el usuario reporta `chainId 42220` (mainnet) en la app aunque su wallet dice "Celo Sepolia". Diagnóstico pendiente (ver "Issues abiertos" abajo).
+- ✅ ChainId detection resuelto: badge muestra el chainId real del wallet, no el cacheado de wagmi
+- ⏸ **Pendiente end-to-end test**: usuario tiene 6.99 CELO en Celo Sepolia pero 0 USDT. Necesita faucet de USDT testnet antes de probar swap real.
 
 ---
 
@@ -97,19 +98,11 @@ TESTNET (Celo Sepolia 11142220)  ← post L2 migration, no es 44787
 
 ## Issues abiertos
 
-### 🔴 BLOCKER: chainId mismatch
-**Síntoma**: el usuario está en MiniPay/Chrome con "Celo Sepolia" seleccionada en la wallet, pero `useChainId()` devuelve `42220` (mainnet).
-**Probable causa**: MetaMask tiene una red custom llamada "Celo Sepolia" pero con chainId 42220 en vez de 11142220. Aceptar sugerencias de nombre de MetaMask puede llevar a este problema.
-**Diagnóstico**: ejecutar en consola del browser:
-```js
-const id = await window.ethereum.request({ method: 'eth_chainId' });
-console.log('hex:', id, '→ decimal:', parseInt(id, 16));
-```
-- `0xaa044c` (11142220) = Celo Sepolia ✅
-- `0xa4ec1` (42220) = mainnet ❌
-- Cualquier otro = red mal configurada
-
-**Fix del usuario**: borrar la red custom, agregar Celo Sepolia manualmente con `Chain ID: 11142220` (ignorar sugerencias de nombre de MetaMask).
+### ✅ RESUELTO: chainId mismatch (era wagmi stale)
+**Síntoma**: el usuario está en MiniPay/Chrome con "Celo Sepolia" seleccionada en la wallet, pero la app mostraba `chainId 42220` (mainnet) en el badge.
+**Causa raíz**: wagmi v2 `useChainId()` devolvía el valor inicial cacheado y no se actualizaba al disparar `chainChanged`. La wallet SÍ estaba en 11142220 (`window.ethereum.request({method: 'eth_chainId'})` devolvía `0xaa044c`).
+**Fix**: nuevo hook `useRealChainId` en `hooks/useRealChainId.ts` que lee `window.ethereum.chainId` directamente y escucha `chainChanged`. Toda la app (`app/swap/page.tsx`, `useSwap`, `useQuotes`) usa este hook en vez de `useChainId()` de wagmi.
+**Status**: Resuelto 22-jun-2026. Usuario confirmó badge verde "Celo Sepolia (chainId 11142220)" y botón habilitado.
 
 ### 🟡 MiniPay no implementa `wallet_switchEthereumChain`
 - `wallet_switchEthereumChain` es silenciosamente ignorado (no error, no dialog)
@@ -122,17 +115,29 @@ console.log('hex:', id, '→ decimal:', parseInt(id, 16));
 - La red activa sigue siendo mainnet a menos que el usuario la cambie manualmente
 - Documentado en el comment del código y en el badge de red
 
+### 🟡 Multi-injected wallets (Trust Wallet + MetaMask)
+- Trust Wallet se inyecta antes que MetaMask y a veces intercepta las llamadas
+- `lib/wagmi.ts` ya tiene `metaMask()` primero en la lista de connectors
+- `useWallet` y el CTA chequean `window.ethereum.isMetaMask` y usan el connector correcto
+- En entornos muy sucios, abrir ventana de incógnito con solo MetaMask es más seguro
+
 ### 🟢 Legacy Alfajores 44787
 - Algunas wallets (y posiblemente versiones viejas de wagmi) reportan 44787
 - `isCeloTestnet()` acepta ambos, badge muestra naranja "legacy" para 44787
 - Si wagmi devuelve 44787, los contratos en Mento SDK probablemente no van a matchear (Mento está deployado en Sepolia 11142220)
 
+### 🟡 Falta USDT testnet para probar end-to-end
+- Usuario tiene 6.99 CELO en Celo Sepolia pero 0 USDT
+- CELO no se usa en este flow (solo USDT)
+- Pendiente: pedir USDT en Discord `#testnet-faucet` o Google Cloud faucet
+- Una vez con USDT, swap 0.10 USDT → verificar COPm recibido en wallet
+
 ---
 
 ## Próximos pasos
 
-1. **Resolver el blocker del chainId** con el diagnóstico de arriba
-2. **End-to-end test en Celo Sepolia**: faucet USDT testnet (Discord `#testnet-faucet` o cloud.google.com faucet), swap 0.10 USDT, verificar COPm recibido
+1. **Pedir USDT testnet** en Discord `#testnet-faucet` o https://cloud.google.com/application/web3/faucet/celo/sepolia
+2. **End-to-end test en Celo Sepolia**: swap 0.10 USDT, verificar COPm recibido en wallet
 3. **Decidir mainnet**: requiere liquidez USDT→USDm validada (en el pivote falló con "no valid median")
 4. **Productos sobre COPm**: yield, P2P payments, remittances — basado en tracción, no antes
 5. **UI polish**: copy, error states, loading states con mensajes claros
@@ -217,3 +222,6 @@ ngrok http 3000
 | `47eab6f` | fix(wallet): auto-connect in browser + make Connect button work |
 | `e0620b6` | fix(wallet): prefer MetaMask over other injected wallets |
 | `3c68aa6` | fix(swap): accept legacy Alfajores chainId 44787 as testnet |
+| `bf2960a` | docs: rewrite CLAUDE.md to reflect post-pivot architecture |
+| `b574a58` | fix(wallet): force wagmi to re-read chainId on chainChanged |
+| `a4f2645` | fix(wallet): use direct window.ethereum.chainId instead of stale wagmi (RESUELVE BLOCKER) |
