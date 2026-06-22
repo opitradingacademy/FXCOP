@@ -12,7 +12,11 @@
 
 import { Mento } from "@mento-protocol/mento-sdk";
 import { formatCOPm } from "../decimals";
-import { CELO_MAINNET_CHAIN_ID, CELO_TESTNET_CHAIN_ID, getContracts } from "../contracts";
+import {
+  CELO_MAINNET_CHAIN_ID,
+  isCeloTestnet,
+  getContracts,
+} from "../contracts";
 import type { Quote } from "./types";
 
 // Cached Mento instances per chainId
@@ -36,7 +40,7 @@ async function getMento(chainId: number): Promise<Mento> {
 export async function getMentoQuote(amountInRaw: bigint, chainId: number): Promise<Quote> {
   if (amountInRaw === 0n) return unavailable();
 
-  if (chainId !== CELO_MAINNET_CHAIN_ID && chainId !== CELO_TESTNET_CHAIN_ID) {
+  if (chainId !== CELO_MAINNET_CHAIN_ID && !isCeloTestnet(chainId)) {
     console.error(`[mentoQuoter] unsupported chainId: ${chainId}`);
     return unavailable();
   }

@@ -75,3 +75,14 @@ export function getContracts(chainId: number): MainnetContracts | TestnetContrac
       );
   }
 }
+
+/**
+ * True if the chainId is a Celo testnet (any version).
+ * 11142220 = Celo Sepolia (L2, current)
+ * 44787 = Alfajores (L1, legacy but still around in some wallets)
+ */
+export function isCeloTestnet(chainId: number | undefined): boolean {
+  if (chainId === undefined) return false;
+  return chainId === 11142220 || chainId === 44787;
+}
+

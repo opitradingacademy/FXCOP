@@ -11,7 +11,7 @@ import { useSwap } from "@/hooks/useSwap";
 import { AppShell, AppHeader, CtaButton } from "@/components/AppShell";
 import { SwapInputCard } from "@/components/swap/SwapInputCard";
 import {
-  CELO_TESTNET_CHAIN_ID,
+  isCeloTestnet,
 } from "@/lib/contracts";
 
 export default function SwapPage() {
@@ -28,8 +28,10 @@ export default function SwapPage() {
   const { data: quote, isFetching, error: quoteError } = useQuotes(amountIn, chainId);
   const { state, error: swapError, execute, reset } = useSwap();
 
-  const isTestnet = chainId === CELO_TESTNET_CHAIN_ID;
+  const isTestnet = isCeloTestnet(chainId);
   const isMainnet = chainId === 42220;
+  const isLegacyTestnet = chainId === 44787; // old Alfajores L1, no longer preferred
+  const isUnknownNetwork = !isTestnet && !isMainnet && chainId !== undefined;
 
   const handleSwitchToTestnet = async () => {
     setSwitchError(null);
@@ -44,14 +46,12 @@ export default function SwapPage() {
         method: "wallet_switchEthereumChain",
         params: [{ chainId: "0xaa044c" }], // 11142220 in hex (Celo Sepolia)
       });
-      // If we got here, the wallet accepted. wagmi will update chainId via event.
     } catch (err: any) {
       console.error("[FXCOP] wallet_switchEthereumChain threw:", err);
       const code = err?.code;
       const msg = err?.message || "Error desconocido";
 
       if (code === 4902) {
-        // Chain not added. Try to add it.
         try {
           await eth.request({
             method: "wallet_addEthereumChain",
@@ -67,14 +67,14 @@ export default function SwapPage() {
           });
         } catch (addErr: any) {
           console.error("[FXCOP] wallet_addEthereumChain threw:", addErr);
-          setSwitchError(`MiniPay no soporta agregar Celo Sepolia. Cód: ${addErr?.code ?? "?"}`);
+          setSwitchError(`La wallet no soporta agregar Celo Sepolia. Cód: ${addErr?.code ?? "?"}`);
         }
       } else if (code === 4001) {
-        setSwitchError("Rechazaste el cambio de red en MiniPay.");
+        setSwitchError("Rechazaste el cambio de red.");
       } else if (code === 4200) {
-        setSwitchError("MiniPay no permite cambiar de red desde la app. Hacélo manualmente.");
+        setSwitchError("La wallet no permite cambiar de red desde la app. Hacélo manualmente.");
       } else {
-        setSwitchError(`MiniPay no soporta cambio de red. Cód: ${code} · ${msg.slice(0, 80)}`);
+        setSwitchError(`La wallet no soporta cambio de red. Cód: ${code} · ${msg.slice(0, 80)}`);
       }
     }
   };
@@ -126,9 +126,11 @@ export default function SwapPage() {
       {isTestnet ? (
         <div
           style={{
-            background: "rgba(245,158,11,0.1)",
-            border: "1px solid var(--accent)",
-            color: "var(--accent)",
+            background: isLegacyTestnet
+              ? "rgba(245,158,11,0.1)"
+              : "rgba(16,185,129,0.1)",
+            border: isLegacyTestnet ? "1px solid var(--accent)" : "1px solid var(--primary)",
+            color: isLegacyTestnet ? "var(--accent)" : "var(--primary)",
             padding: "8px 12px",
             borderRadius: 10,
             fontSize: 12,
@@ -137,7 +139,9 @@ export default function SwapPage() {
             textAlign: "center",
           }}
         >
-          Red de prueba · Alfajores (chainId {chainId})
+          {isLegacyTestnet
+            ? `⚠ Red Alfajores legacy (chainId ${chainId}). Funciona, pero migrá a Celo Sepolia (11142220) para alinear con wagmi.`
+            : `Red de prueba · Celo Sepolia (chainId ${chainId})`}
         </div>
       ) : isConnected ? (
         <div style={{ marginBottom: 12 }}>
