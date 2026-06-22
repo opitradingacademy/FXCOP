@@ -28,6 +28,40 @@ export default function SwapPage() {
   const isTestnet = chainId === CELO_TESTNET_CHAIN_ID;
   const isMainnet = chainId === 42220;
 
+  const handleSwitchToTestnet = async () => {
+    try {
+      // Celo Sepolia chain params (EIP-3085 / EIP-3326)
+      await (window as any).ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0xaa044c" }], // 11155111 in hex
+      });
+    } catch (err: any) {
+      // 4902 = chain not added to wallet. Add it then retry.
+      if (err?.code === 4902) {
+        try {
+          await (window as any).ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: "0xaa044c",
+                chainName: "Celo Sepolia (Alfajores Testnet)",
+                nativeCurrency: { name: "CELO", symbol: "A-CELO", decimals: 18 },
+                rpcUrls: ["https://alfajores-forno.celo-testnet.org"],
+                blockExplorerUrls: ["https://alfajores.celoscan.io"],
+              },
+            ],
+          });
+        } catch {
+          // Wallet refused or doesn't support adding chains. User must do it manually.
+          console.error("[FXCOP] wallet_addEthereumChain failed");
+        }
+      } else {
+        // 4001 = user rejected. Other errors = wallet doesn't support switch.
+        console.error("[FXCOP] wallet_switchEthereumChain failed:", err);
+      }
+    }
+  };
+
   // HARD GUARD: this build only allows swaps on testnet.
   // The router contract doesn't exist anymore and the mainnet Mento pools
   // don't have a USDT→USDm route — mainnet swaps would fail AND burn gas.
@@ -78,7 +112,8 @@ export default function SwapPage() {
           Red de prueba · Alfajores (chainId {chainId})
         </div>
       ) : isConnected ? (
-        <div
+        <button
+          onClick={handleSwitchToTestnet}
           style={{
             background: "rgba(244,63,94,0.1)",
             border: "1px solid var(--danger)",
@@ -89,10 +124,13 @@ export default function SwapPage() {
             fontWeight: 600,
             marginBottom: 12,
             textAlign: "center",
+            width: "100%",
+            cursor: "pointer",
+            fontFamily: "var(--font-outfit), sans-serif",
           }}
         >
-          ⚠ Mainnet detectado (chainId {chainId}). Cambia a Alfajores en tu wallet para probar.
-        </div>
+          ⚠ Mainnet (chainId {chainId}) · Toca para cambiar a Alfajores
+        </button>
       ) : null}
 
       <SwapInputCard
