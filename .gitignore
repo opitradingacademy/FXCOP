@@ -51,3 +51,4 @@ ignition/deployments/
 
 # Hardhat Ignition journal (contains tx hashes, not secrets, but not needed in repo)
 # ignition/deployments/ already above
+npx/
