@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount, useChainId, useConnect } from "wagmi";
+import { injected } from "wagmi/connectors";
 import { parseUnits } from "viem";
 import { useWallet } from "@/hooks/useWallet";
 import { useQuotes } from "@/hooks/useQuotes";
@@ -17,6 +18,7 @@ export default function SwapPage() {
   const router = useRouter();
   const { isConnected } = useAccount();
   const chainId = useChainId();
+  const { connect, isPending: isConnecting } = useConnect();
   const { usdtBalance, isLoading: walletLoading } = useWallet();
 
   const [inputDisplay, setInputDisplay] = useState("");
@@ -87,6 +89,14 @@ export default function SwapPage() {
     quote?.isAvailable === true &&
     !isFetching &&
     state === "idle";
+
+  const handleCta = () => {
+    if (!isConnected) {
+      connect({ connector: injected() });
+      return;
+    }
+    handleSwap();
+  };
 
   const handleSwap = async () => {
     if (!quote?.isAvailable) return;
@@ -265,10 +275,12 @@ export default function SwapPage() {
       )}
 
       <CtaButton
-        onClick={handleSwap}
-        disabled={!canSwap}
+        onClick={handleCta}
+        disabled={isConnected && !canSwap}
       >
-        {!isConnected
+        {isConnecting
+          ? "Conectando..."
+          : !isConnected
           ? "Conecta tu wallet"
           : !isTestnet
           ? "Cambia a Alfajores para probar"

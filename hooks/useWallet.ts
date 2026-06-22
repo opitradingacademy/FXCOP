@@ -58,13 +58,20 @@ export function useWallet(): WalletState {
   const chainId = useChainId();
   const { connect, isPending: isConnecting } = useConnect();
 
-  // ── Detect MiniPay and auto-connect ──
+  // ── Detect wallet and auto-connect ──
+  // In MiniPay: window.ethereum.isMiniPay === true → auto-connect.
+  // In browser with MetaMask: window.ethereum exists, isMiniPay is undefined/false → auto-connect too.
+  // Only skip auto-connect if there's no injected provider at all.
   useEffect(() => {
     const ethereum = (window as any).ethereum;
-    const detected = Boolean(ethereum?.isMiniPay);
+    if (!ethereum) {
+      setIsMiniPay(false);
+      return;
+    }
+    const detected = Boolean(ethereum.isMiniPay);
     setIsMiniPay(detected);
 
-    if (detected && !isConnected) {
+    if (!isConnected) {
       connect({ connector: injected() });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
