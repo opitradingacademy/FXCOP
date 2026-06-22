@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount, useChainId, useConnect } from "wagmi";
-import { injected } from "wagmi/connectors";
+import { metaMask, injected } from "wagmi/connectors";
 import { parseUnits } from "viem";
 import { useWallet } from "@/hooks/useWallet";
 import { useQuotes } from "@/hooks/useQuotes";
@@ -92,7 +92,10 @@ export default function SwapPage() {
 
   const handleCta = () => {
     if (!isConnected) {
-      connect({ connector: injected() });
+      // Prefer MetaMask connector (avoids Trust Wallet grabbing the call first).
+      // Fallback to injected if MetaMask isn't installed.
+      const isMetaMask = (window as any)?.ethereum?.isMetaMask;
+      connect({ connector: isMetaMask ? metaMask() : injected() });
       return;
     }
     handleSwap();

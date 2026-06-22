@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { useAccount, useChainId, useConnect, useReadContract } from "wagmi";
-import { injected } from "wagmi/connectors";
+import { injected, metaMask } from "wagmi/connectors";
 import { MAINNET } from "@/lib/contracts";
 
 // Minimal ERC-20 balanceOf ABI
@@ -59,9 +59,9 @@ export function useWallet(): WalletState {
   const { connect, isPending: isConnecting } = useConnect();
 
   // ── Detect wallet and auto-connect ──
-  // In MiniPay: window.ethereum.isMiniPay === true → auto-connect.
-  // In browser with MetaMask: window.ethereum exists, isMiniPay is undefined/false → auto-connect too.
-  // Only skip auto-connect if there's no injected provider at all.
+  // In MiniPay: window.ethereum.isMiniPay === true → use injected (only wallet present).
+  // In browser with MetaMask: prefer the metaMask connector (avoids Trust Wallet hijack).
+  // In browser with other injected wallet: use injected() as fallback.
   useEffect(() => {
     const ethereum = (window as any).ethereum;
     if (!ethereum) {
@@ -72,7 +72,8 @@ export function useWallet(): WalletState {
     setIsMiniPay(detected);
 
     if (!isConnected) {
-      connect({ connector: injected() });
+      const isMetaMask = Boolean(ethereum.isMetaMask);
+      connect({ connector: isMetaMask ? metaMask() : injected() });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
