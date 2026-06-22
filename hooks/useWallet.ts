@@ -12,7 +12,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount, useConnect, useReadContract } from "wagmi";
+import { useAccount, useChainId, useConnect, useReadContract } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { MAINNET } from "@/lib/contracts";
 
@@ -33,6 +33,8 @@ export const FEE_CURRENCY = MAINNET.USDT_FEE_ADAPTER as `0x${string}`;
 export interface WalletState {
   /** Connected wallet address, or undefined if not connected */
   address: `0x${string}` | undefined;
+  /** Connected chain ID (42220 mainnet, 11155111 Celo Sepolia) */
+  chainId: number | undefined;
   /** True when running inside MiniPay */
   isMiniPay: boolean;
   /** Raw USDT balance (6 decimals). 0n on load or error. */
@@ -53,6 +55,7 @@ export function useWallet(): WalletState {
   const [balanceLoading, setBalanceLoading] = useState(false);
 
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const { connect, isPending: isConnecting } = useConnect();
 
   // ── Detect MiniPay and auto-connect ──
@@ -111,6 +114,7 @@ export function useWallet(): WalletState {
 
   return {
     address,
+    chainId,
     isMiniPay,
     usdtBalance,
     isConnected,

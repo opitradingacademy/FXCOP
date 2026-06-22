@@ -1,53 +1,74 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAccount, useChainId } from "wagmi";
 import { parseUnits } from "viem";
 import { useWallet } from "@/hooks/useWallet";
 import { useQuotes } from "@/hooks/useQuotes";
+import { useSwap } from "@/hooks/useSwap";
 import { AppShell, AppHeader, CtaButton } from "@/components/AppShell";
 import { SwapInputCard } from "@/components/swap/SwapInputCard";
-import { SwapOutputCard } from "@/components/swap/SwapOutputCard";
-import { RoutesList } from "@/components/swap/RoutesList";
+import {
+  CELO_TESTNET_CHAIN_ID,
+} from "@/lib/contracts";
 
 export default function SwapPage() {
   const router = useRouter();
+  const { isConnected } = useAccount();
+  const chainId = useChainId();
   const { usdtBalance, isLoading: walletLoading } = useWallet();
 
-  const [amountIn, setAmountIn] = useState<bigint>(0n);
   const [inputDisplay, setInputDisplay] = useState("");
-  const lastUpdatedRef = useRef<number | null>(null);
+  const [amountIn, setAmountIn] = useState<bigint>(0n);
 
-  const { data: quotes, isFetching } = useQuotes(amountIn);
+  const { data: quote, isFetching, error: quoteError } = useQuotes(amountIn, chainId);
+  const { state, error: swapError, execute, reset } = useSwap();
 
-  if (quotes && !isFetching) lastUpdatedRef.current = Date.now();
+  const isTestnet = chainId === CELO_TESTNET_CHAIN_ID;
 
-  const bestQuote = quotes?.best ?? null;
-  const canSwap = amountIn > 0n && bestQuote?.isAvailable === true && !isFetching;
+  const canSwap =
+    isConnected &&
+    amountIn > 0n &&
+    quote?.isAvailable === true &&
+    !isFetching &&
+    state === "idle";
 
-  const handleSwap = () => {
-    if (!bestQuote) return;
-    const params = new URLSearchParams({
-      amountIn: amountIn.toString(),
-      routeType: bestQuote.routeType,
-      amountOut: bestQuote.amountOutNet.toString(),
-      feeApp: bestQuote.feeApp.toString(),
-      savings: (bestQuote.savingsVsBaseline ?? 0n).toString(),
-    });
-    router.push(`/confirm?${params.toString()}`);
+  const handleSwap = async () => {
+    if (!quote?.isAvailable) return;
+    await execute(amountIn);
   };
+
+  // Navigate to /done on success
+  if (state === "success" && quote) {
+    const params = new URLSearchParams({
+      amountOut: quote.amountOut.toString(),
+    });
+    router.push(`/done?${params.toString()}`);
+    reset();
+  }
 
   return (
     <AppShell>
-      <AppHeader
-        title="FXCOP"
-        right={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        }
-      />
+      <AppHeader title="FXCOP" />
+
+      {isTestnet && (
+        <div
+          style={{
+            background: "rgba(245,158,11,0.1)",
+            border: "1px solid var(--accent)",
+            color: "var(--accent)",
+            padding: "8px 12px",
+            borderRadius: 10,
+            fontSize: 12,
+            fontWeight: 600,
+            marginBottom: 12,
+            textAlign: "center",
+          }}
+        >
+          Red de prueba · Alfajores
+        </div>
+      )}
 
       <SwapInputCard
         value={inputDisplay}
@@ -58,38 +79,114 @@ export default function SwapPage() {
         usdtBalance={walletLoading ? 0n : usdtBalance}
       />
 
-      <div style={{ display: "flex", justifyContent: "center", margin: "-4px 0", position: "relative", zIndex: 2 }}>
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            background: "var(--surface-2)",
-            border: "4px solid var(--surface)",
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "var(--text-2)",
-          }}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="14" height="14">
-            <path d="M7 13l5 5 5-5M7 6l5 5 5-5" />
-          </svg>
+      <div
+        style={{
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
+          borderRadius: 18,
+          padding: 14,
+          marginBottom: 10,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, color: "var(--text-3)", fontWeight: 500, marginBottom: 8 }}>
+              Recibes
+            </div>
+            <div
+              style={{
+                fontSize: 28,
+                fontWeight: 600,
+                color:
+                  !quote || isFetching
+                    ? "var(--text-3)"
+                    : quote.isAvailable
+                    ? "var(--text)"
+                    : "var(--danger)",
+                fontFamily: "var(--font-mono), monospace",
+              }}
+            >
+              {amountIn === 0n
+                ? "—"
+                : isFetching
+                ? "..."
+                : quote?.isAvailable
+                ? quote.amountOutFormatted
+                : "Sin ruta disponible"}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 6 }}>
+              {amountIn > 0n && quote?.isAvailable
+                ? `≈ ${quote.amountOutFormatted} pesos colombianos`
+                : "Cotización en tiempo real vía Mento"}
+            </div>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "var(--bg)",
+              padding: "6px 10px 6px 6px",
+              borderRadius: 999,
+              border: "1px solid var(--border)",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--text)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #fcd34d, #f59e0b)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "white",
+                fontSize: 10,
+                fontWeight: 700,
+              }}
+            >
+              $
+            </span>
+            COPm
+          </div>
         </div>
       </div>
 
-      <SwapOutputCard quote={bestQuote} isLoading={amountIn > 0n && isFetching} />
+      {quoteError && (
+        <div style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8, textAlign: "center" }}>
+          No pudimos obtener la cotización. Probá de nuevo en unos segundos.
+        </div>
+      )}
 
-      <RoutesList
-        quotes={quotes}
-        isLoading={amountIn > 0n && isFetching}
-        lastUpdatedMs={lastUpdatedRef.current}
-      />
+      {swapError && state === "error" && (
+        <div style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8, textAlign: "center" }}>
+          {swapError}
+        </div>
+      )}
 
-      <CtaButton onClick={handleSwap} disabled={!canSwap}>
-        {canSwap
-          ? `Swap mejor ruta · ${bestQuote!.amountOutFormatted} COPm`
-          : "Ingresá un monto para continuar"}
+      <CtaButton
+        onClick={handleSwap}
+        disabled={!canSwap}
+      >
+        {!isConnected
+          ? "Conectá tu wallet"
+          : amountIn === 0n
+          ? "Ingresá un monto"
+          : isFetching
+          ? "Cotizando..."
+          : state === "building"
+          ? "Preparando..."
+          : state === "approving"
+          ? "Aprobando USDT..."
+          : state === "swapping"
+          ? "Comprando COPm..."
+          : quote?.isAvailable
+          ? `Comprar COPm`
+          : "Sin ruta disponible"}
       </CtaButton>
     </AppShell>
   );

@@ -23,10 +23,10 @@ export function SwapInputCard({ value, onChange, usdtBalance }: Props) {
     }
   };
 
-  const balanceFormatted = parseFloat(formatUnits(usdtBalance, 6)).toFixed(2);
+  const balanceFormatted = formatUnits(usdtBalance, 6);
 
   const setMax = () => {
-    onChange(usdtBalance, formatUnits(usdtBalance, 6));
+    onChange(usdtBalance, balanceFormatted);
   };
 
   return (
@@ -42,7 +42,7 @@ export function SwapInputCard({ value, onChange, usdtBalance }: Props) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 12, color: "var(--text-3)", fontWeight: 500, marginBottom: 8 }}>
-            Enviás
+            Envias
           </div>
           <input
             type="text"
@@ -77,7 +77,7 @@ export function SwapInputCard({ value, onChange, usdtBalance }: Props) {
                   background: "rgba(16,185,129,0.1)",
                 }}
               >
-                MAX {balanceFormatted}
+                MAX
               </button>
             )}
           </div>

@@ -1,123 +1,79 @@
-import { QuoteService, RouteService, PoolService, SwapService } from "@mento-protocol/mento-sdk";
-import { createPublicClient, http } from "viem";
-import { celo } from "viem/chains";
-import { MAINNET } from "../contracts";
-import type { RouteQuote } from "./types";
+/**
+ * lib/quotes/mentoQuoter.ts
+ * Mento SDK direct: USDT → COPm, no aggregator, no fee.
+ *
+ * Uses @mento-protocol/mento-sdk. The SDK abstracts multi-hop routing
+ * (e.g. USDT→USDm→COPm), discovers pools on-chain, and handles
+ * circuit-breaker/oracle validation internally.
+ *
+ * We cache the Mento instance per chainId to avoid re-bootstrapping
+ * services (each call would re-fetch pool/route data otherwise).
+ */
 
-const publicClient = createPublicClient({ chain: celo, transport: http() });
-const CELO_CHAIN_ID = 42220;
+import { Mento } from "@mento-protocol/mento-sdk";
+import { formatCOPm } from "../decimals";
+import { CELO_MAINNET_CHAIN_ID, CELO_TESTNET_CHAIN_ID, getContracts } from "../contracts";
+import type { Quote } from "./types";
 
-// Services are stateful (cache routes + pools) — instantiate once per session
-let _services: {
-  poolService: PoolService;
-  routeService: RouteService;
-  quoteService: QuoteService;
-  swapService: SwapService;
-} | null = null;
+// Cached Mento instances per chainId
+const mentoCache: Map<number, Mento> = new Map();
 
-async function getServices() {
-  if (!_services) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pc = publicClient as any;
-    const poolService = new PoolService(pc, CELO_CHAIN_ID);
-    const routeService = new RouteService(pc, CELO_CHAIN_ID, poolService);
-    const quoteService = new QuoteService(pc, CELO_CHAIN_ID, routeService);
-    const swapService = new SwapService(pc, CELO_CHAIN_ID, routeService, quoteService);
-    _services = { poolService, routeService, quoteService, swapService };
+async function getMento(chainId: number): Promise<Mento> {
+  if (!mentoCache.has(chainId)) {
+    const mento = await Mento.create(chainId);
+    mentoCache.set(chainId, mento);
   }
-  return _services;
+  return mentoCache.get(chainId)!;
 }
 
 /**
- * Get a Mento quote for USDT → COPm.
- * Uses @mento-protocol/mento-sdk QuoteService which discovers routes on-chain,
- * finding the correct factory/exchange-provider address for each hop automatically.
+ * Get a Mento quote for USDT → COPm on the given chain.
+ * Returns isAvailable=false if no route exists or the SDK reverts.
  *
  * @param amountInRaw - USDT amount in raw units (6 decimals)
+ * @param chainId     - 42220 (mainnet) or 11155111 (Celo Sepolia)
  */
-export async function getMentoQuote(amountInRaw: bigint): Promise<RouteQuote> {
+export async function getMentoQuote(amountInRaw: bigint, chainId: number): Promise<Quote> {
   if (amountInRaw === 0n) return unavailable();
 
-  try {
-    const { quoteService } = await getServices();
+  if (chainId !== CELO_MAINNET_CHAIN_ID && chainId !== CELO_TESTNET_CHAIN_ID) {
+    console.error(`[mentoQuoter] unsupported chainId: ${chainId}`);
+    return unavailable();
+  }
 
-    const amountOut = await quoteService.getAmountOut(
-      MAINNET.USDT,
-      MAINNET.COPM,
+  try {
+    const mento = await getMento(chainId);
+    const contracts = getContracts(chainId);
+    const amountOut = await mento.quotes.getAmountOut(
+      contracts.USDT,
+      contracts.COPM,
       amountInRaw
     );
 
     if (!amountOut || amountOut === 0n) {
-      console.warn("[mentoQuoter] getAmountOut returned 0");
+      console.warn("[mentoQuoter] getAmountOut returned 0 — no liquidity or no route");
       return unavailable();
     }
 
-    const feeApp = (amountOut * 5n) / 10_000n;
-    const amountOutNet = amountOut - feeApp;
-
     return {
-      routeType: "mento",
-      amountOut,
-      amountOutNet,
-      amountOutFormatted: formatCOPmForDisplay(amountOutNet),
-      feeApp,
-      gasEstimate: 300_000n,
-      savingsVsBaseline: 0n,
+      amountOut,                    // Mento returns expected output (pre-slippage)
+      amountOutExpected: amountOut,
+      amountOutFormatted: formatCOPm(amountOut),
+      gasEstimate: 300_000n,        // Mento multi-hop is ~250k–350k gas
       isAvailable: true,
     };
   } catch (err) {
-    console.error("[mentoQuoter] failed:", err);
+    console.error("[mentoQuoter] quote failed:", err);
     return unavailable();
   }
 }
 
-/**
- * Build the ABI-encoded calldata for the Mento route.
- * Uses SwapService so the SDK resolves the correct factory addresses on-chain.
- * Called by useSwap — only after a successful getMentoQuote.
- */
-export async function buildMentoRouteData(
-  amountIn: bigint,
-  minAmountOut: bigint,
-  recipient: `0x${string}`,
-  deadline: bigint
-): Promise<`0x${string}`> {
-  const { swapService } = await getServices();
-
-  const result = await swapService.buildSwapParams(
-    MAINNET.USDT,
-    MAINNET.COPM,
-    amountIn,
-    recipient,
-    { slippageTolerance: 0, deadline },  // slippage = 0: we handle it with minAmountOut
-  );
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (swapService as any).encodeSwapCall(
-    amountIn,
-    minAmountOut,
-    result.routerRoutes,
-    recipient,
-    deadline
-  ) as `0x${string}`;
-}
-
-function formatCOPmForDisplay(raw: bigint): string {
-  const whole = raw / 10n ** 18n;
-  const fraction = raw % 10n ** 18n;
-  const fractionStr = fraction.toString().padStart(18, "0").slice(0, 2);
-  return `${whole.toLocaleString("es-CO")}.${fractionStr}`;
-}
-
-function unavailable(): RouteQuote {
+function unavailable(): Quote {
   return {
-    routeType: "mento",
     amountOut: 0n,
-    amountOutNet: 0n,
+    amountOutExpected: 0n,
     amountOutFormatted: "0.00",
-    feeApp: 0n,
     gasEstimate: 0n,
-    savingsVsBaseline: 0n,
     isAvailable: false,
   };
 }

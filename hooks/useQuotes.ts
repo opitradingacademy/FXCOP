@@ -1,20 +1,22 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { getAggregatedQuotes, type AggregatedQuotes } from "../lib/quotes/aggregator";
+import { getMentoQuote } from "../lib/quotes/mentoQuoter";
+import type { Quote } from "../lib/quotes/types";
 
-const QUOTE_STALE_MS = 30_000; // invalidate before confirm screen if stale >30s
+const QUOTE_STALE_MS = 30_000; // invalidate before confirm if stale >30s
 
 /**
- * Poll aggregated USDT→COPm quotes every 5 seconds (≈1 Celo block).
+ * Poll a Mento USDT→COPm quote every 5 seconds (≈1 Celo block).
  * Returns undefined until the first successful fetch.
  *
- * @param amountInRaw - USDT in raw units (6 dec). Pass 0n to disable fetching.
+ * @param amountInRaw - USDT in raw units (6 dec). Pass 0n to disable.
+ * @param chainId     - 42220 (mainnet) or 11155111 (Celo Sepolia)
  */
-export function useQuotes(amountInRaw: bigint) {
-  return useQuery<AggregatedQuotes>({
-    queryKey: ["fxcop-quotes", amountInRaw.toString()],
-    queryFn: () => getAggregatedQuotes(amountInRaw),
+export function useQuotes(amountInRaw: bigint, chainId: number) {
+  return useQuery<Quote>({
+    queryKey: ["fxcop-quote", chainId, amountInRaw.toString()],
+    queryFn: () => getMentoQuote(amountInRaw, chainId),
     enabled: amountInRaw > 0n,
     refetchInterval: 5_000,
     staleTime: QUOTE_STALE_MS,

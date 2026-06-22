@@ -1,19 +1,28 @@
-export type RouteQuote = {
-  routeType: "mento" | "ubeswap" | "best";
-  amountOut: bigint;          // COPm raw 18 dec — ANTES del fee FXCOP
-  amountOutNet: bigint;       // COPm raw — DESPUÉS del fee (lo que recibe el usuario)
-  amountOutFormatted: string; // amountOutNet formateado para UI
-  feeApp: bigint;             // 0.05% en COPm raw (18 dec)
+/**
+ * lib/quotes/types.ts
+ * Simple types for the Mento-direct USDT → COPm flow.
+ *
+ * No aggregator, no fee model, no router of our own.
+ * The Mento SDK gives us the net amount the user will receive.
+ */
+
+export type Quote = {
+  /** COPm raw 18-dec — what the user will receive (after slippage) */
+  amountOut: bigint;
+  /** COPm raw 18-dec — the expected amount before slippage */
+  amountOutExpected: bigint;
+  /** amountOut formatted with thousand separators for UI */
+  amountOutFormatted: string;
+  /** Estimated gas in wei (raw bigint) */
   gasEstimate: bigint;
-  savingsVsBaseline: bigint;  // vs Mento directo, en COPm raw
+  /** True when Mento returned a valid quote */
   isAvailable: boolean;
-  /** Ubeswap V3 pool fee tier (e.g. 500, 3000, 10000). Only set for routeType=ubeswap. */
-  poolFee?: number;
 };
 
-export type SwapState = "idle" | "approving" | "approved" | "swapping" | "success" | "error";
-
-export type TxConfig = {
-  feeCurrency: `0x${string}`;
-  gasPrice: bigint;
-};
+export type SwapState =
+  | "idle"
+  | "building"
+  | "approving"
+  | "swapping"
+  | "success"
+  | "error";

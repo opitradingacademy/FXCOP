@@ -16,9 +16,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FXCOP — El mejor cambio de USDT a COPm",
+  title: "FXCOP — Comprá pesos colombianos con USDT",
   description:
-    "Agrega rutas USDT→COPm en tiempo real (Mento v3, Ubeswap V3) y ejecuta el mejor swap con un tap.",
+    "Comprá COPm (peso colombiano digital) con tus USDT en un solo paso, dentro de MiniPay.",
 };
 
 export default function RootLayout({

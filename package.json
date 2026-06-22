@@ -7,16 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:contracts": "npx hardhat test",
-    "deploy:alfajores": "npx hardhat ignition deploy ignition/modules/FXCOPRouter.js --network celoSepolia",
-    "smoke:alfajores": "npx hardhat test test/FXCOPRouter.smoke.cjs --network celoSepolia",
-    "bundle:check": "next build && node scripts/check-bundle-size.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@mento-protocol/mento-sdk": "^3.2.8",
-    "@openzeppelin/contracts": "^5.6.1",
     "@tanstack/react-query": "^5.101.0",
     "next": "16.2.9",
     "react": "19.2.4",
@@ -25,39 +19,14 @@
     "wagmi": "^2.19.5"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
-    "@nomicfoundation/hardhat-ethers": "^3.1.3",
-    "@nomicfoundation/hardhat-ignition": "^0.15.16",
-    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.17",
-    "@nomicfoundation/hardhat-network-helpers": "^1.1.2",
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "@nomicfoundation/hardhat-verify": "^2.1.3",
-    "@nomicfoundation/ignition-core": "^0.15.15",
     "@tailwindcss/postcss": "^4",
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@typechain/ethers-v6": "^0.5.1",
-    "@typechain/hardhat": "^9.1.0",
-    "@types/chai": "^5.2.3",
-    "@types/mocha": "^10.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^6.0.2",
-    "chai": "^6.2.2",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
-    "ethers": "^6.17.0",
-    "hardhat": "^2.28.6",
-    "hardhat-gas-reporter": "^2.3.0",
-    "jsdom": "^29.1.1",
-    "solidity-coverage": "^0.8.17",
     "tailwindcss": "^4",
-    "ts-node": "^10.9.2",
-    "typechain": "^8.3.2",
-    "typescript": "^5",
-    "vitest": "^4.1.9"
+    "typescript": "^5"
   }
 }
