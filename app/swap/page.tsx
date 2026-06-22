@@ -21,6 +21,7 @@ export default function SwapPage() {
 
   const [inputDisplay, setInputDisplay] = useState("");
   const [amountIn, setAmountIn] = useState<bigint>(0n);
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   const { data: quote, isFetching, error: quoteError } = useQuotes(amountIn, chainId);
   const { state, error: swapError, execute, reset } = useSwap();
@@ -29,17 +30,28 @@ export default function SwapPage() {
   const isMainnet = chainId === 42220;
 
   const handleSwitchToTestnet = async () => {
+    setSwitchError(null);
+    const eth = (window as any).ethereum;
+    if (!eth?.request) {
+      setSwitchError("Tu wallet no expone la API estándar. Cambiá de red manualmente.");
+      return;
+    }
+
     try {
-      // Celo Sepolia chain params (EIP-3085 / EIP-3326)
-      await (window as any).ethereum.request({
+      await eth.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: "0xaa044c" }], // 11142220 in hex (Celo Sepolia)
       });
+      // If we got here, the wallet accepted. wagmi will update chainId via event.
     } catch (err: any) {
-      // 4902 = chain not added to wallet. Add it then retry.
-      if (err?.code === 4902) {
+      console.error("[FXCOP] wallet_switchEthereumChain threw:", err);
+      const code = err?.code;
+      const msg = err?.message || "Error desconocido";
+
+      if (code === 4902) {
+        // Chain not added. Try to add it.
         try {
-          await (window as any).ethereum.request({
+          await eth.request({
             method: "wallet_addEthereumChain",
             params: [
               {
@@ -51,13 +63,16 @@ export default function SwapPage() {
               },
             ],
           });
-        } catch {
-          // Wallet refused or doesn't support adding chains. User must do it manually.
-          console.error("[FXCOP] wallet_addEthereumChain failed");
+        } catch (addErr: any) {
+          console.error("[FXCOP] wallet_addEthereumChain threw:", addErr);
+          setSwitchError(`MiniPay no soporta agregar Celo Sepolia. Cód: ${addErr?.code ?? "?"}`);
         }
+      } else if (code === 4001) {
+        setSwitchError("Rechazaste el cambio de red en MiniPay.");
+      } else if (code === 4200) {
+        setSwitchError("MiniPay no permite cambiar de red desde la app. Hacélo manualmente.");
       } else {
-        // 4001 = user rejected. Other errors = wallet doesn't support switch.
-        console.error("[FXCOP] wallet_switchEthereumChain failed:", err);
+        setSwitchError(`MiniPay no soporta cambio de red. Cód: ${code} · ${msg.slice(0, 80)}`);
       }
     }
   };
@@ -112,25 +127,43 @@ export default function SwapPage() {
           Red de prueba · Alfajores (chainId {chainId})
         </div>
       ) : isConnected ? (
-        <button
-          onClick={handleSwitchToTestnet}
-          style={{
-            background: "rgba(244,63,94,0.1)",
-            border: "1px solid var(--danger)",
-            color: "var(--danger)",
-            padding: "10px 12px",
-            borderRadius: 10,
-            fontSize: 12,
-            fontWeight: 600,
-            marginBottom: 12,
-            textAlign: "center",
-            width: "100%",
-            cursor: "pointer",
-            fontFamily: "var(--font-outfit), sans-serif",
-          }}
-        >
-          ⚠ Mainnet (chainId {chainId}) · Toca para cambiar a Alfajores
-        </button>
+        <div style={{ marginBottom: 12 }}>
+          <button
+            onClick={handleSwitchToTestnet}
+            style={{
+              background: "rgba(244,63,94,0.1)",
+              border: "1px solid var(--danger)",
+              color: "var(--danger)",
+              padding: "10px 12px",
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 600,
+              textAlign: "center",
+              width: "100%",
+              cursor: "pointer",
+              fontFamily: "var(--font-outfit), sans-serif",
+            }}
+          >
+            ⚠ Mainnet (chainId {chainId}) · Toca para cambiar a Celo Sepolia
+          </button>
+          {switchError && (
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-2)",
+                marginTop: 6,
+                textAlign: "center",
+                lineHeight: 1.4,
+              }}
+            >
+              {switchError}
+              <br />
+              <span style={{ color: "var(--text-3)" }}>
+                Si no podés cambiar desde acá, abrí MiniPay → Ajustes → Redes → agregá Celo Sepolia manualmente.
+              </span>
+            </div>
+          )}
+        </div>
       ) : null}
 
       <SwapInputCard
