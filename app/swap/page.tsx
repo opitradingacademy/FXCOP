@@ -26,9 +26,14 @@ export default function SwapPage() {
   const { state, error: swapError, execute, reset } = useSwap();
 
   const isTestnet = chainId === CELO_TESTNET_CHAIN_ID;
+  const isMainnet = chainId === 42220;
 
+  // HARD GUARD: this build only allows swaps on testnet.
+  // The router contract doesn't exist anymore and the mainnet Mento pools
+  // don't have a USDT→USDm route — mainnet swaps would fail AND burn gas.
   const canSwap =
     isConnected &&
+    isTestnet &&
     amountIn > 0n &&
     quote?.isAvailable === true &&
     !isFetching &&
@@ -36,6 +41,10 @@ export default function SwapPage() {
 
   const handleSwap = async () => {
     if (!quote?.isAvailable) return;
+    if (!isTestnet) {
+      console.error("[FXCOP] swap blocked: not on testnet", chainId);
+      return;
+    }
     await execute(amountIn);
   };
 
@@ -52,7 +61,7 @@ export default function SwapPage() {
     <AppShell>
       <AppHeader title="FXCOP" />
 
-      {isTestnet && (
+      {isTestnet ? (
         <div
           style={{
             background: "rgba(245,158,11,0.1)",
@@ -66,9 +75,25 @@ export default function SwapPage() {
             textAlign: "center",
           }}
         >
-          Red de prueba · Alfajores
+          Red de prueba · Alfajores (chainId {chainId})
         </div>
-      )}
+      ) : isConnected ? (
+        <div
+          style={{
+            background: "rgba(244,63,94,0.1)",
+            border: "1px solid var(--danger)",
+            color: "var(--danger)",
+            padding: "10px 12px",
+            borderRadius: 10,
+            fontSize: 12,
+            fontWeight: 600,
+            marginBottom: 12,
+            textAlign: "center",
+          }}
+        >
+          ⚠ Mainnet detectado (chainId {chainId}). Cambia a Alfajores en tu wallet para probar.
+        </div>
+      ) : null}
 
       <SwapInputCard
         value={inputDisplay}
@@ -173,9 +198,11 @@ export default function SwapPage() {
         disabled={!canSwap}
       >
         {!isConnected
-          ? "Conectá tu wallet"
+          ? "Conecta tu wallet"
+          : !isTestnet
+          ? "Cambia a Alfajores para probar"
           : amountIn === 0n
-          ? "Ingresá un monto"
+          ? "Ingresa un monto"
           : isFetching
           ? "Cotizando..."
           : state === "building"
